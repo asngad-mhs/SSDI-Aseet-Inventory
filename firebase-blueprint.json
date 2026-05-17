@@ -1,0 +1,66 @@
+{
+  "entities": {
+    "Asset": {
+      "title": "Asset",
+      "description": "A company asset recorded in the system.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the asset" },
+        "category": { "type": "string", "enum": ["IT", "Office", "Furniture", "Vehicle", "Machinery", "Other"] },
+        "serialNumber": { "type": "string" },
+        "purchaseDate": { "type": "string", "format": "date-time" },
+        "cost": { "type": "number" },
+        "locationId": { "type": "string" },
+        "status": { "type": "string", "enum": ["Available", "In Use", "Under Maintenance", "Retired", "Missing"] },
+        "condition": { "type": "string", "enum": ["Excellent", "Good", "Fair", "Poor", "Broken"] },
+        "nextMaintenanceDate": { "type": "string", "format": "date-time" },
+        "lastMaintenanceDate": { "type": "string", "format": "date-time" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "image": { "type": "string" }
+      },
+      "required": ["name", "category", "status", "condition", "ownerId"]
+    },
+    "Location": {
+      "title": "Location",
+      "description": "Physical location where assets are stored.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "MaintenanceLog": {
+      "title": "Maintenance Log",
+      "description": "Record of maintenance activities for an asset.",
+      "type": "object",
+      "properties": {
+        "assetId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["Routine", "Repair", "Upgrade", "Inspection"] },
+        "description": { "type": "string" },
+        "cost": { "type": "number" },
+        "performedBy": { "type": "string" },
+        "status": { "type": "string", "enum": ["Completed", "Scheduled"] }
+      },
+      "required": ["assetId", "ownerId", "date", "type", "status"]
+    }
+  },
+  "firestore": {
+    "/assets/{assetId}": {
+      "schema": "Asset",
+      "description": "Collection of all assets."
+    },
+    "/locations/{locationId}": {
+      "schema": "Location",
+      "description": "Collection of asset locations."
+    },
+    "/maintenance_logs/{logId}": {
+      "schema": "MaintenanceLog",
+      "description": "Collection of maintenance history logs."
+    }
+  }
+}

@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(data) {
+      return isSignedIn() && data.ownerId == request.auth.uid;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Assets ---
+    match /assets/{assetId} {
+      function isValidAsset(data) {
+        return data.keys().hasAll(['name', 'category', 'status', 'condition', 'ownerId', 'createdAt', 'updatedAt'])
+               && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+               && data.category in ['IT', 'Office', 'Furniture', 'Vehicle', 'Machinery', 'Other']
+               && data.status in ['Available', 'In Use', 'Under Maintenance', 'Retired', 'Missing']
+               && data.condition in ['Excellent', 'Good', 'Fair', 'Poor', 'Broken']
+               && data.ownerId == request.auth.uid
+               && (data.get('cost', 0) is number && data.get('cost', 0) >= 0)
+               && (data.get('serialNumber', '') is string && data.get('serialNumber', '').size() <= 100);
+      }
+
+      allow get: if isSignedIn() && isOwner(existing());
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      
+      allow create: if isSignedIn() && isValidId(assetId) && isValidAsset(incoming())
+                       && incoming().createdAt == request.time
+                       && incoming().updatedAt == request.time;
+      
+      allow update: if isOwner(existing()) && isValidAsset(incoming())
+                       && incoming().updatedAt == request.time
+                       && incoming().createdAt == existing().createdAt
+                       && (
+                         // Action: Move Location
+                         incoming().diff(existing()).affectedKeys().hasOnly(['locationId', 'updatedAt']) ||
+                         // Action: Change Status/Condition
+                         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'condition', 'updatedAt']) ||
+                         // Action: Edit Details
+                         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'category', 'serialNumber', 'cost', 'updatedAt']) ||
+                         // Action: Maintenance Update
+                         incoming().diff(existing()).affectedKeys().hasOnly(['lastMaintenanceDate', 'nextMaintenanceDate', 'updatedAt']) ||
+                         // Action: Full Update (if all fields provided)
+                         incoming().diff(existing()).affectedKeys().hasAll(['updatedAt'])
+                       );
+      
+      allow delete: if isOwner(existing());
+    }
+
+    // --- Locations ---
+    match /locations/{locationId} {
+      function isValidLocation(data) {
+        return data.keys().hasAll(['name'])
+               && data.name is string && data.name.size() > 0 && data.name.size() <= 100
+               && (data.get('description', '') is string && data.get('description', '').size() <= 500);
+      }
+
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidId(locationId) && isValidLocation(incoming());
+      allow update: if isSignedIn() && isValidLocation(incoming())
+                       && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description']);
+      allow delete: if isSignedIn();
+    }
+
+    // --- Maintenance Logs ---
+    match /maintenance_logs/{logId} {
+      function isValidLog(data) {
+        return data.keys().hasAll(['assetId', 'ownerId', 'date', 'type', 'status'])
+               && data.assetId is string && data.assetId.size() > 0
+               && data.ownerId == request.auth.uid
+               && data.type in ['Routine', 'Repair', 'Upgrade', 'Inspection']
+               && data.status in ['Completed', 'Scheduled']
+               && (data.get('cost', 0) is number && data.get('cost', 0) >= 0);
+      }
+
+      function ownsLinkedAsset(assetId) {
+        return get(/databases/$(database)/documents/assets/$(assetId)).data.ownerId == request.auth.uid;
+      }
+
+      allow get: if isSignedIn() && isOwner(existing());
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      allow create: if isSignedIn() && isValidId(logId) && isValidLog(incoming())
+                       && ownsLinkedAsset(incoming().assetId);
+      
+      allow update: if isOwner(existing())
+                       && isValidLog(incoming())
+                       && incoming().assetId == existing().assetId
+                       && (
+                         incoming().diff(existing()).affectedKeys().hasOnly(['date', 'type', 'status', 'description', 'cost', 'performedBy'])
+                       );
+      
+      allow delete: if isOwner(existing());
+    }
+  }
+}

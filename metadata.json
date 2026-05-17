@@ -1,0 +1,6 @@
+{
+  "name": "SSDI Asset Inventory",
+  "description": "Sistem Inventaris Aset SSDI yang komprehensif untuk pencatatan, pelacakan lokasi, riwayat pemeliharaan, dan manajemen siklus hidup aset secara real-time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
